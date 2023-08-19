@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++11 -static-libgcc -static-libstdc++
+CXXFLAGS = -std=c++17 -static-libgcc -static-libstdc++
 
 .PHONY: all clean
 

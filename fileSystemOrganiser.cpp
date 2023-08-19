@@ -5,6 +5,7 @@
 #include <sys/stat.h> // For checking directory existence
 #include <map>
 #include <vector>
+#include <filesystem>
 
 // Define a global map with string keys and vector values
 std::map<std::string, std::vector<std::string>> dataMap = {
@@ -12,6 +13,28 @@ std::map<std::string, std::vector<std::string>> dataMap = {
     {"archives", {"zip", "tar", "gz", "7z", "rar", "ar", "iso", "xz"}},
     {"documents", {"docs", "doc", "pdf", "xlsx", "xls", "odt", "ods", "odp", "odg", "odf", "txt", "ps", "tex"}},
     {"app", {"exe", "pkg", "dmg", "deb"}}
+};
+
+std::map<std::string, std::string> dMap = {
+    {"exe",  "app"},
+    {"pkg",  "app"},
+    {"dmg",  "app"},
+    {"deb",  "app"},
+    {"zip",  "archives"},
+    {"tar",  "archives"},
+    {"gz",   "archives"},
+    {"7z",   "archives"},
+    {"rar",  "archives"},
+    {"iso",  "archives"},
+    {"docs", "documents"},
+    {"doc",  "documents"},
+    {"pdf",  "documents"},
+    {"xlsx", "documents"},
+    {"txt",  "documents"},
+    {"mp4",  "media"},
+    {"mkv",  "media"},
+    {"mov",  "media"},
+    
 };
 
 
@@ -24,41 +47,84 @@ void printHelp() {
               << "  -t, --tree DIR      Print the contents of the directory in a tree format\n";
 }
 
-void printDirectoryContents(const char* directory) {
-    DIR* dir = opendir(directory);
-    if (dir == nullptr) {
-        std::cerr << "Error opening directory: " << directory << "\n";
+void printDirectoryContents(const std::string& directory) {
+    for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+        std::cout << entry.path().filename().string() << "\n";
+    }
+}
+
+bool directoryExists(const std::string& path) {
+    return std::filesystem::is_directory(path);
+}
+
+bool createDirectory(const std::string& path, const std::string& dir) {
+    std::string directory = path + dir;
+    if (std::filesystem::create_directory(directory)) {
+        std::cout << "Created directory: " << directory << "\n";
+    } else {
+        std::cerr << "Failed to create directory: " << directory << "\n";
+        return false;
+    }
+
+    return true;
+}
+
+bool createOrganisedFilesDirectory(const std::string& path) {
+    return createDirectory(path, "/Organised Files");
+    
+}
+
+void copyFileToOrganisedDirectory(const std::string& source, const std::string& destination) {
+    if (std::filesystem::exists(destination)) return;
+
+    std::filesystem::copy(source, destination);
+    std::cout << "Copied file: " << source << " to " << destination << "\n";
+}
+
+void organiseDirectoryContents(const std::string& directory) {
+    if (!directoryExists(directory)) {
+        std::cerr << "No such directory exists\n";
         return;
     }
 
-    dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        if (std::strcmp(entry->d_name, ".") != 0 && std::strcmp(entry->d_name, "..") != 0) {
-            std::cout << entry->d_name << "\n";
+    // 1. Create a directory "Organised Files" inside the directory provided
+    if (!std::filesystem::exists(directory + "/Organised Files")) {
+        if (!createOrganisedFilesDirectory(directory)) {
+            return;
         }
     }
 
-    closedir(dir);
-}
-
-void organiseDirectoryContents(const char* directory) {
-    DIR* dir = opendir(directory);
-    if (dir == nullptr) {
-        std::cerr << "Error opening directory: " << directory << "\n";
-        return;
-    }
-
-    // 1. Create a directory organised_files inside the directory provided
     // 2. Check which category do each file belong to
-    // 3. Copy / Move files to the organised_files directory inside any of the category folders
+    for (const auto& entry : std::filesystem::directory_iterator(directory)) {
+        if (entry.is_regular_file()) {
 
-    closedir(dir);
+            // 3. Copy / Move files to the "Organised Files" directory inside any of the category folders
+            std::string extension = entry.path().extension().string();
+            if (!extension.empty()) {
+                // Remove the leading dot
+                if (extension.front() == '.') {
+                    extension = extension.substr(1);
+                }
+
+                if (dMap.find(extension) != dMap.end()) {
+                    std::string orgFolder = dMap[extension];
+                    if (!std::filesystem::exists(directory + "/Organised Files/" + orgFolder)) {
+                        if (!createDirectory(directory, "/Organised Files/" + orgFolder)) {
+                            return;
+                        }
+                    }
+
+                    std::string source = entry.path().string();
+                    std::string destination = directory + "/Organised Files/" + orgFolder + "/" + entry.path().filename().string();
+                    copyFileToOrganisedDirectory(source, destination);
+                }
+            }
+        }
+    }
+    
+    
 }
 
-bool directoryExists(const char* path) {
-    struct stat fileInfo;
-    return (stat(path, &fileInfo) == 0 && S_ISDIR(fileInfo.st_mode));
-}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -105,12 +171,12 @@ int main(int argc, char* argv[]) {
     if (std::strcmp(directory, ".") == 0) {
         // Handle current directory
         std::cout << "Processing current directory.\n";
-        // Implement your processing logic here
+        organiseDirectoryContents(directory);
     } else {
         if (directoryExists(directory)) {
             // Handle the specified directory
             std::cout << "Processing directory: " << directory << "\n";
-            // Implement your processing logic here
+            organiseDirectoryContents(directory);
         } else {
             std::cerr << "Invalid or non-existent directory: " << directory << "\n";
             return 1;
@@ -119,90 +185,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
-
-
-#if 0
-#include <iostream>
-#include <cstdlib>
-#include <cstring>
-#include <dirent.h> // For directory operations
-#include <unistd.h> // For getopt
-
-void printHelp() {
-    std::cout << "Usage: fs [OPTION] DIRECTORY\n"
-              << "Custom command to organise files a directory.\n"
-              << "Options:\n"
-              << "  -h, --help         Display this help and exit\n"
-              << "  -p, --print DIR    Print the contents of the specified directory\n";
-}
-
-void printDirectoryContents(const char* directory) {
-    DIR* dir = opendir(directory);
-    if (dir == nullptr) {
-        std::cerr << "Error opening directory: " << directory << "\n";
-        return;
-    }
-
-    dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        if (std::strcmp(entry->d_name, ".") != 0 && std::strcmp(entry->d_name, "..") != 0) {
-            std::cout << entry->d_name << "\n";
-        }
-    }
-
-    closedir(dir);
-}
-
-int main(int argc, char* argv[]) {
-    int opt;
-    const char* directory = nullptr;
-    static struct option long_options[] = {
-        {"help", no_argument, nullptr, 'h'},
-        {"print", required_argument, nullptr, 'p'},
-        {nullptr, 0, nullptr, 0}
-    };
-
-    while ((opt = getopt_long(argc, argv, "hp:", long_options, nullptr)) != -1) {
-        switch (opt) {
-            case 'h':
-                printHelp();
-                return 0;
-            case 'p':
-                directory = optarg;
-                printDirectoryContents(directory);
-                return 0;
-            default:
-                std::cerr << "Invalid option. Use -h or --help for help.\n";
-                return 1;
-        }
-    }
-
-    std::cout << optind << " " << argc << std::endl;
-    for (int i = 0; i < argc; i++) {
-        std::cout << argv[i] << std::endl;
-    }
-
-    if (optind < argc) {
-        directory = argv[optind];
-    }
-
-    if (directory == nullptr) {
-        std::cerr << "Missing directory argument. Use -h or --help for help.\n";
-        return 1;
-    }
-
-    // Perform processing based on the directory
-    if (std::strcmp(directory, ".") == 0) {
-        // Handle current directory
-        std::cout << "Processing current directory.\n";
-        // Implement your processing logic here
-    } else {
-        // Handle the specified directory
-        std::cout << "Processing directory: " << directory << "\n";
-        // Implement your processing logic here
-    }
-
-    return 0;
-}
-#endif
