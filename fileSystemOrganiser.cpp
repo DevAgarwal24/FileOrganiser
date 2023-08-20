@@ -1,7 +1,4 @@
 #include <iostream>
-#include <cstdlib>
-#include <cstring>
-#include <dirent.h> // For directory operations
 #include <sys/stat.h> // For checking directory existence
 #include <map>
 #include <vector>
@@ -151,21 +148,23 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (std::strcmp(argv[1], "-h") == 0 || std::strcmp(argv[1], "--help") == 0) {
+    std::string options = argv[1];
+
+    if (options.compare("-h") == 0 || options.compare("--help") == 0) {
         printHelp();
         return 0;
     }
 
-    if (std::strcmp(argv[1], "-m") == 0) {
+    if (options.compare("-m") == 0) {
         moveFiles = true;
     }
 
-    if (std::strcmp(argv[1], "-p") == 0 || std::strcmp(argv[1], "--print") == 0) {
+    if (options.compare("-p") == 0 || options.compare("--print") == 0) {
         if (argc < 3) {
             std::cerr << "Missing directory argument for -p or --print option.\n";
             return 1;
         }
-        const char* directory = argv[2];
+        std::string directory = argv[2];
         if (!directoryExists(directory)) {
             std::cerr << "Invalid or non-existent directory: " << directory << "\n";
             return 1;
@@ -174,12 +173,12 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (std::strcmp(argv[1], "-t") == 0 || std::strcmp(argv[1], "--tree") == 0) {
+    if (options.compare("-t") == 0 || options.compare("--tree") == 0) {
         if (argc < 3) {
             std::cerr << "Missing directory argument for -p or --print option.\n";
             return 1;
         }
-        const char* directory = argv[2];
+        std::string directory = argv[2];
         if (!directoryExists(directory)) {
             std::cerr << "Invalid or non-existent directory: " << directory << "\n";
             return 1;
@@ -188,7 +187,7 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    const char* directory;
+    std::string directory;
     if (moveFiles) {
         directory = argv[2];
     } else {
@@ -196,7 +195,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Perform processing based on the directory
-    if (std::strcmp(directory, ".") == 0) {
+    if (directory.compare(".") == 0) {
         // Handle current directory
         std::cout << "Processing current directory.\n";
         organiseDirectoryContents(directory);
