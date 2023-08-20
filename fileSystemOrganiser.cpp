@@ -37,12 +37,15 @@ std::map<std::string, std::string> dMap = {
     
 };
 
+// Global variable check if we should move the files or just copy
+bool moveFiles = false;
 
 void printHelp() {
     std::cout << "Usage: fso [OPTION] DIRECTORY\n"
               << "Custom Linux command to organise the contents of a directory.\n"
               << "Options:\n"
               << "  -h, --help          Display this help and exit\n"
+              << "  -m,                 Move the files to the organised directory. Default is copy.\n"
               << "  -p, --print DIR     Print the contents of the specified directory\n"
               << "  -t, --tree DIR      Print the contents of the directory in a tree format\n";
 }
@@ -71,7 +74,18 @@ bool createDirectory(const std::string& path, const std::string& dir) {
 
 bool createOrganisedFilesDirectory(const std::string& path) {
     return createDirectory(path, "/Organised Files");
-    
+}
+
+void moveFileToOrganisedDirectory(const std::string& source, const std::string& destination) {
+    if (std::filesystem::exists(destination)) return;   // Doing nothing if file already exists. The file can be deleted
+    // Update the function to delete the files, if needed.
+
+    try {
+        std::filesystem::rename(source, destination);
+        std::cout << "Moved file: " << source << " to " << destination << "\n";
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "Error moving file: " << e.what() << "\n";
+    }
 }
 
 void copyFileToOrganisedDirectory(const std::string& source, const std::string& destination) {
@@ -116,7 +130,12 @@ void organiseDirectoryContents(const std::string& directory) {
 
                     std::string source = entry.path().string();
                     std::string destination = directory + "/Organised Files/" + orgFolder + "/" + entry.path().filename().string();
-                    copyFileToOrganisedDirectory(source, destination);
+
+                    if (moveFiles) {
+                        moveFileToOrganisedDirectory(source, destination);
+                    } else {
+                        copyFileToOrganisedDirectory(source, destination);
+                    }
                 }
             }
         }
@@ -135,6 +154,10 @@ int main(int argc, char* argv[]) {
     if (std::strcmp(argv[1], "-h") == 0 || std::strcmp(argv[1], "--help") == 0) {
         printHelp();
         return 0;
+    }
+
+    if (std::strcmp(argv[1], "-m") == 0) {
+        moveFiles = true;
     }
 
     if (std::strcmp(argv[1], "-p") == 0 || std::strcmp(argv[1], "--print") == 0) {
@@ -165,7 +188,12 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    const char* directory = argv[1];
+    const char* directory;
+    if (moveFiles) {
+        directory = argv[2];
+    } else {
+        directory = argv[1];
+    }
 
     // Perform processing based on the directory
     if (std::strcmp(directory, ".") == 0) {
